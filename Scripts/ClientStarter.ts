@@ -30,7 +30,55 @@ export default class ClientStarter extends ZepetoScriptBehaviour {
         this.multiplay.RoomJoined += (room: Room) => {
             room.OnStateChange += this.OnStateChange;
         };
+
+        // StartCoroutine정기적으로 클라이언트의 위치정보 전달
+        this.StartCoroutine(this.SendMessageLoop(0.1));
     }
+
+    private * SendMessageLoop(tick: number) {
+        while (true) {
+            yield new UnityEngine.WaitForSeconds(tick);
+
+            if (this.room != null && this.room.IsConnected) {
+                // 로컬 플레이어의 인스턴스 존재여부를 판단 HasPlayer
+                const hasPlayer = ZepetoPlayers.instance.HasPlayer(this.room.SessionId);
+                // 로컬 플레이어가 있다면 myPlayer에 로컬 플레이어 인스턴스를 저장
+                if (hasPlayer) {
+                    const myPlayer = ZepetoPlayers.instance.GetPlayer(this.room.SessionId);
+                    // 만약 myPlayer가 움직이면, 내 위치 정보를 전송
+                    // SendTransform 함수로 정의하여 전송
+                    if (myPlayer.character.CurrentState != CharacterState.Idle) {
+                        this.SendTransform(myPlayer.character.transform);
+                    }
+                }
+            }
+        }
+    }
+
+    // 내 위치 정보를 전송하는 함수
+    private SendTransform(transform: UnityEngine.Transform) {
+        // transform을 전송하기 위해 RoomData 객체 생성
+        const data = new RoomData();
+
+        // position을 넣어줄 RoomData 객체 생성
+        const pos = new RoomData();
+        pos.Add("x", transform.localPosition.x);
+        pos.Add("y", transform.localPosition.y);
+        pos.Add("z", transform.localPosition.z);
+        data.Add("position", pos.GetObject());
+
+        // rotation을 넣어줄 RoomData 객체 생성
+        const rot = new RoomData();
+        rot.Add("x", transform.localEulerAngles.x);
+        rot.Add("y", transform.localEulerAngles.y);
+        rot.Add("z", transform.localEulerAngles.z);
+        data.Add("rotation", rot.GetObject());
+
+        // onChanged 타입으로 메세지를 전송
+        this.room.Send("onChangedTransform", data.GetObject);
+    }
+
+
 
     // OnStateChange() 는 RoomJoined() 되었을 때, 처음에만 true이고 이후부터는 False를 유지
     private OnStateChange(state: State, isFirst: boolean) {
