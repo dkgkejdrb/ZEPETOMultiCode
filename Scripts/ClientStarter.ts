@@ -75,7 +75,7 @@ export default class ClientStarter extends ZepetoScriptBehaviour {
         data.Add("rotation", rot.GetObject());
 
         // onChanged 타입으로 메세지를 전송
-        this.room.Send("onChangedTransform", data.GetObject);
+        this.room.Send("onChangedTransform", data.GetObject());
     }
 
 
