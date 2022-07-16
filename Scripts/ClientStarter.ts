@@ -120,7 +120,8 @@ export default class ClientStarter extends ZepetoScriptBehaviour {
 
         // schema에 저장된 room state의 값을 foreach로 하나씩 조회 
         state.players.ForEach((sessionId: string, player: Player) => {
-            if (this.currentPlayers.has(sessionId)) {
+            // currentPlayers 중 sessionId를 가지고 있지 않다면 지금 입장한 player로 봄 
+            if (!this.currentPlayers.has(sessionId)) {
                 join.set(sessionId, player);
             }
             // Room에 존재하는 player는 모두 제거하고, 퇴장한 player만 leave에 추가
@@ -150,7 +151,7 @@ export default class ClientStarter extends ZepetoScriptBehaviour {
         // 현재 캐릭에 state를 저장
         data.Add("state", state);
         // 서버로 메세지를 전송
-        this.room.Send("OnChangedState", data.GetObject());
+        this.room.Send("onChangedState", data.GetObject());
     }
 
 
