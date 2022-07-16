@@ -1,11 +1,11 @@
 // 멀티플레이에 Room 임포트
 import { CharacterState, SpawnInfo, ZepetoPlayer, ZepetoPlayers } from 'ZEPETO.Character.Controller';
 import { Room, RoomData } from 'ZEPETO.Multiplay';
-import { Player, State } from 'ZEPETO.Multiplay.Schema';
-import { ZepetoScriptBehaviour } from 'ZEPETO.Script'
+import { Player, State, Vector3 } from 'ZEPETO.Multiplay.Schema';
+import { ZepetoScriptBehaviour } from 'ZEPETO.Script';
 // 멀티플레이에 필요한 클래스 임포트
-import { ZepetoWorldMultiplay } from 'ZEPETO.World'
-import * as UnityEngine from 'UnityEngine'
+import { ZepetoWorldMultiplay } from 'ZEPETO.World';
+import * as UnityEngine from 'UnityEngine';
 
 
 export default class ClientStarter extends ZepetoScriptBehaviour {
@@ -95,21 +95,53 @@ export default class ClientStarter extends ZepetoScriptBehaviour {
                     this.SendState(cur);
                 })
             });
+
+            // 캐릭터 정보를 전송받기 위해 OnAddedPlayer에 새로운 리스너를 추가
+            ZepetoPlayers.instance.OnAddedPlayer.AddListener((sessionId: string) => {
+                // local player가 아닌 경우에만 업데이트하도록
+                // local player인지 판단하는 isLocal 상수를 생성
+                const isLocal = this.room.SessionId === sessionId;
+
+                // local player가 아니라면
+                if (!isLocal) {
+                    // current players에 sessionId에 해당하는 플레이어를 불러옴
+                    const player: Player = this.currentPlayers.get(sessionId);
+
+                    // player의 위치 정보를 업데이트 하는 함수 선언
+                    player.OnChange += (ChangeValues) => this.OnUpdatePlayer(sessionId, player);
+                }
+            });
         }
 
         // join 한 플레이어를 관리하기 위해 맵을 생성하여 새로운 변수 join에 할당
         let join = new Map<string, Player>();
+        // leave 한 플레이어를 관리하기 위해 맵을 생성하여 새로운 변수 leave에 할당
+        let leave = new Map<string, Player>(this.currentPlayers);
 
         // schema에 저장된 room state의 값을 foreach로 하나씩 조회 
         state.players.ForEach((sessionId: string, player: Player) => {
             if (this.currentPlayers.has(sessionId)) {
                 join.set(sessionId, player);
             }
+            // Room에 존재하는 player는 모두 제거하고, 퇴장한 player만 leave에 추가
+            leave.delete(sessionId);
         });
 
         // room에 플레이어가 입장할 때 event를 받을 수 있게 플레이어 객체에 .OnJoinPlayer()를 연결
         join.forEach((player: Player, sessionId: string) => this.OnJoinPlayer(sessionId, player));
+
+        // Room에서 퇴장한 모든 player 인스턴스를 제거하기 위해 OnLeavePlayer() 호출
+        leave.forEach((player: Player, sessionId: string) => this.OnLeavePlayer(sessionId, player));
     }
+
+    private OnLeavePlayer(sessionId: string, player: Player) {
+        console.log(`[OnRemove] players - sessionId : ${sessionId}`);
+        this.currentPlayers.delete(sessionId);
+
+        ZepetoPlayers.instance.RemovePlayer(sessionId);
+    }
+
+
 
     // 서버로 state 전송하기
     private SendState(state: CharacterState) {
@@ -149,5 +181,30 @@ export default class ClientStarter extends ZepetoScriptBehaviour {
 
         // ZepetoPlayers.instance.CreatePlayerWithUser()로 플레이어 인스턴스를 생성
         ZepetoPlayers.instance.CreatePlayerWithUserId(sessionId, player.zepetoUserId, spawnInfo, isLocal);
+    }
+
+    
+    private OnUpdatePlayer(sessionId: string, player: Player) {
+        
+        const position = this.ParseVector3(player.transform.position);
+
+        // 위치를 업데이트할 player를 받아옴
+        const zepetoPlayer = ZepetoPlayers.instance.GetPlayer(sessionId);
+
+        // MoveToPosition() 함수로 플레이어를 이동
+        zepetoPlayer.character.MoveToPosition(position);
+
+        // 플레이어 상태가 점프인 경우, 점프 상태를 호출
+        if (player.state === CharacterState.JumpIdle || player.state === CharacterState.JumpMove)
+            zepetoPlayer.character.Jump();
+    }
+
+    // ParseVector3 에서 인자로 포함된 Schema 타입의 Vector3를 유니티엔진의 Vector3로 변환
+    private ParseVector3(vector3: Vector3): UnityEngine.Vector3 {
+        return new UnityEngine.Vector3(
+            vector3.x,
+            vector3.y,
+            vector3.z
+        );
     }
 }
