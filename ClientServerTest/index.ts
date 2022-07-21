@@ -5,13 +5,31 @@ import { DataStorage } from "ZEPETO.Multiplay.DataStorage";
 import { Player, Transform, Vector3 } from "ZEPETO.Multiplay.Schema";
 
 
+
 export default class extends Sandbox {
+    // deltaTime의 누적합 변수는 반드시 0으로 초기화
+    tempTime: number = 0;
+    spawnDelayTime: number = 5;
+    
+
+    onTick(deltaTime: number) {
+        this.tempTime += deltaTime;
+        
+        if (this.tempTime / 1000 > this.spawnDelayTime) {
+            console.log("count");
+            this.tempTime = 0;
+        }
+    }
+
+
 
     // Room이 생성되었을 때
     // Client 코드로부터 수신된 메시지를 확인하기 위해
     onCreate(options: SandboxOptions) {
+        
+        
         this.onMessage("message", (client: SandboxPlayer, message: string) => {
-
+            
             //
             // Triggers when 'message' message is sent.
             //
@@ -85,6 +103,10 @@ export default class extends Sandbox {
         // 플레이어의 고유 정보(sessionID)와 player객체를 Room state에 저장
         this.state.players.set(client.sessionId, player);
     }
+
+
+
+
 
     // Room 퇴장시 클라이언트의 sessionId 삭제
     onLeave(client: SandboxPlayer, consented?: boolean) {
